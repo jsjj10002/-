@@ -6,16 +6,15 @@
     <title>일본어 단어장 AI</title>
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Pretendard (Korean) and M PLUS Rounded 1c (Japanese) -->
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Gothic A1 (Korean) and M PLUS Rounded 1c (Japanese) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@100;200;300;400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
       body {
-        font-family: 'Pretendard', 'M PLUS Rounded 1c', sans-serif;
+        /* Gothic A1 for Korean/Latin, M PLUS Rounded 1c for Japanese fallback */
+        font-family: 'Gothic A1', 'M PLUS Rounded 1c', sans-serif;
       }
-      /* Apply rounded font specifically to Japanese text areas if needed, 
-         but combining them in body usually works well as Pretendard handles Hangul/Latin 
-         and falls back to M PLUS for Kanji/Kana if configured, or we let M PLUS handle rounded aesthetics. */
       
       .perspective-1000 {
         perspective: 1000px;

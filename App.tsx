@@ -199,7 +199,7 @@ export default function App() {
         {mode === AppMode.HOME && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in overflow-y-auto">
             <div className="max-w-md w-full py-8">
-              <h2 className="text-4xl font-bold text-indigo-900 mb-4 tracking-tight">일본어 한자 마스터</h2>
+              <h2 className="text-4xl font-bold text-indigo-900 mb-4 tracking-tight">일본어 단어 마스터</h2>
               <p className="text-slate-500 mb-8 text-lg">AI와 함께 레벨별 한자를 학습하고 복습하세요.</p>
               
               {/* Learning Section */}
