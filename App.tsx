@@ -176,7 +176,7 @@ export default function App() {
             onClick={handleGoHome}
         >
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">日</div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 hidden sm:block">일본어 단어장 AI</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 hidden sm:block">일본어 단어 마스터</h1>
         </div>
         
         <div className="flex gap-2">

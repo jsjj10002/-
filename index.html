@@ -3,16 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>일본어 단어장 AI</title>
+    <title>일본어 단어 마스터</title>
     <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Gothic A1 (Korean) and M PLUS Rounded 1c (Japanese) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@100;200;300;400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              // Gothic A1을 기본 sans 폰트로 설정, 일본어는 M PLUS Rounded 1c로 폴백
+              sans: ['"Gothic A1"', '"M PLUS Rounded 1c"', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
     <style>
       body {
-        /* Gothic A1 for Korean/Latin, M PLUS Rounded 1c for Japanese fallback */
         font-family: 'Gothic A1', 'M PLUS Rounded 1c', sans-serif;
       }
       
