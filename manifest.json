@@ -1,0 +1,21 @@
+{
+  "name": "Kanji Master AI",
+  "short_name": "KanjiAI",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "description": "AI 기반 일본어 한자 학습 도우미",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1623/1623799.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1623/1623799.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

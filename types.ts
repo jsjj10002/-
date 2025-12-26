@@ -1,3 +1,4 @@
+
 export interface Word {
   id: string;
   kanji: string;
@@ -15,7 +16,8 @@ export interface Word {
 export enum AppMode {
   HOME = 'HOME',
   LEARN = 'LEARN',
-  REVIEW = 'REVIEW',
+  QUIZ = 'QUIZ',
+  REVIEW_FLASHCARD = 'REVIEW_FLASHCARD',
   VOCABULARY = 'VOCABULARY'
 }
 

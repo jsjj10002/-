@@ -2,52 +2,61 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Word, AppMode } from './types';
 import { fetchNewWords, generateImageForWord } from './services/geminiService';
 import { Flashcard } from './components/Flashcard';
-import { ReviewMode } from './components/ReviewMode';
+import { QuizMode } from './components/QuizMode';
 import { WordList } from './components/WordList';
+import { getAllWordsFromDB, saveWordsToDB } from './services/db';
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>(AppMode.HOME);
   const [level, setLevel] = useState<number>(5);
   const [learnedWords, setLearnedWords] = useState<Word[]>([]);
+  
+  // Session State
   const [currentSessionWords, setCurrentSessionWords] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // UI State
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   // Ref to track if the session is active so we stop generating images if user quits
   const sessionActiveRef = useRef(false);
 
-  // Load from localStorage on mount
+  // Initialize and Load Data
   useEffect(() => {
-    const saved = localStorage.getItem('kanji-master-learned');
-    if (saved) {
-      try {
-        setLearnedWords(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load saved words");
-      }
-    }
+    // Load from IndexedDB
+    getAllWordsFromDB().then(words => {
+        setLearnedWords(words);
+    }).catch(err => console.error("DB Load Error", err));
+
+    // PWA Install Prompt Listener
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
   }, []);
 
-  // Save to localStorage whenever learnedWords changes
-  // FIX: Handle QuotaExceededError because Base64 images are large
+  // Save to DB whenever learnedWords changes (Optimized to batch save if needed, but safe to call)
   useEffect(() => {
-    try {
-      localStorage.setItem('kanji-master-learned', JSON.stringify(learnedWords));
-    } catch (e) {
-      console.warn("Storage quota exceeded. Trying to save without images.", e);
-      try {
-        // Create a copy without image URLs to save space
-        const wordsWithoutImages = learnedWords.map(w => {
-           const { imageUrl, ...rest } = w;
-           return rest;
-        });
-        localStorage.setItem('kanji-master-learned', JSON.stringify(wordsWithoutImages));
-      } catch (retryError) {
-        console.error("Failed to save words even without images", retryError);
-      }
-    }
+     if (learnedWords.length > 0) {
+         saveWordsToDB(learnedWords).catch(e => console.error("Save failed", e));
+     }
   }, [learnedWords]);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        }
+        setDeferredPrompt(null);
+      });
+    } else {
+        alert("이 브라우저에서는 앱 설치를 직접 지원하지 않습니다. 브라우저 메뉴의 '앱 설치' 또는 '홈 화면에 추가'를 이용해주세요.");
+    }
+  };
 
   const startLearning = async () => {
     setLoading(true);
@@ -60,28 +69,20 @@ export default function App() {
       .map(w => w.kanji);
 
     try {
-        // 1. Fetch Text Content
         const newWords = await fetchNewWords(level, existingKanji);
-        
-        // 2. Generate ALL images sequentially
         const total = newWords.length;
         
         for (let i = 0; i < total; i++) {
-            if (!sessionActiveRef.current) break; // User cancelled
-
-            // Simplified loading message as requested
+            if (!sessionActiveRef.current) break; 
             setLoadingMessage(`이미지 생성 중 (${i + 1}/${total})`);
             
             const word = newWords[i];
             if (word.imagePrompt) {
                  try {
                      const url = await generateImageForWord(word.imagePrompt);
-                     if (url) {
-                        word.imageUrl = url;
-                     }
+                     if (url) word.imageUrl = url;
                  } catch (e) {
-                     console.warn(`Failed to generate image for ${word.kanji}`, e);
-                     // Continue without image or use placeholder if needed
+                     console.warn(`Failed to generate image`, e);
                  }
             }
         }
@@ -93,26 +94,37 @@ export default function App() {
         }
     } catch (error) {
         console.error("Error during session setup", error);
-        alert("학습 세션을 생성하는 중 오류가 발생했습니다.");
+        alert("오류가 발생했습니다.");
     } finally {
         setLoading(false);
         setLoadingMessage("");
     }
   };
 
+  const startReviewFlashcards = () => {
+      if (learnedWords.length === 0) return;
+      // Shuffle learned words for review
+      const shuffled = [...learnedWords].sort(() => 0.5 - Math.random());
+      setCurrentSessionWords(shuffled);
+      setCurrentIndex(0);
+      setMode(AppMode.REVIEW_FLASHCARD);
+  }
+
   const handleFinishBatch = () => {
     sessionActiveRef.current = false;
-    // Add current session words to learned list, avoiding duplicates just in case
-    const newUniqueWords = currentSessionWords.filter(
-      nw => !learnedWords.some(lw => lw.kanji === nw.kanji)
-    ).map(w => ({ ...w, learnedAt: new Date().toISOString() }));
-
-    // Reset session state to ensure clean transition
+    
+    // Only add new words if we are in LEARN mode
+    if (mode === AppMode.LEARN) {
+        const newUniqueWords = currentSessionWords.filter(
+          nw => !learnedWords.some(lw => lw.kanji === nw.kanji)
+        ).map(w => ({ ...w, learnedAt: new Date().toISOString() }));
+    
+        setLearnedWords(prev => [...prev, ...newUniqueWords]);
+    }
+    
+    setMode(AppMode.HOME);
     setCurrentSessionWords([]);
     setCurrentIndex(0);
-
-    setLearnedWords(prev => [...prev, ...newUniqueWords]);
-    setMode(AppMode.HOME);
   };
 
   const handleGoHome = () => {
@@ -133,17 +145,16 @@ export default function App() {
         </div>
         
         <div className="flex gap-2">
+          {deferredPrompt && (
+              <button onClick={handleInstallClick} className="px-3 py-1.5 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 transition-colors">
+                  앱 설치
+              </button>
+          )}
           <button 
             onClick={() => { sessionActiveRef.current = false; setMode(AppMode.VOCABULARY); }}
             className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
           >
             단어장 ({learnedWords.length})
-          </button>
-          <button 
-             onClick={() => { sessionActiveRef.current = false; setMode(AppMode.REVIEW); }}
-             className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors sm:hidden"
-          >
-            복습
           </button>
         </div>
       </nav>
@@ -151,11 +162,12 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {mode === AppMode.HOME && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-            <div className="max-w-md w-full">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in overflow-y-auto">
+            <div className="max-w-md w-full py-8">
               <h2 className="text-4xl font-bold text-indigo-900 mb-4">일본어 한자 마스터</h2>
               <p className="text-slate-500 mb-8 text-lg">AI와 함께 레벨별 한자를 학습하고 복습하세요.</p>
               
+              {/* Learning Section */}
               <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 mb-6">
                 <label className="block text-sm font-medium text-slate-700 mb-3">학습 레벨 선택 (JLPT)</label>
                 <div className="flex justify-between gap-2 mb-6">
@@ -187,7 +199,7 @@ export default function App() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      {loadingMessage || "AI가 단어 생성 중..."}
+                      {loadingMessage}
                     </>
                   ) : (
                     "학습 시작하기"
@@ -195,21 +207,32 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Review Button Center */}
-              <div className="mb-8">
-                 <button
-                    onClick={() => { sessionActiveRef.current = false; setMode(AppMode.REVIEW); }}
+              {/* Review & Quiz Section */}
+              <div className="grid gap-4">
+                  <button
+                    onClick={() => { sessionActiveRef.current = false; setMode(AppMode.QUIZ); }}
+                    disabled={learnedWords.length < 4}
+                    className={`
+                        w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-lg shadow-md transition-all active:scale-95
+                        ${learnedWords.length < 4 ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                  >
+                    퀴즈 풀기 🎮
+                  </button>
+                  
+                  <button
+                    onClick={startReviewFlashcards}
                     disabled={learnedWords.length === 0}
                     className={`
-                        w-full border-2 border-indigo-100 bg-white hover:bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl text-lg transition-colors
-                        ${learnedWords.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-200'}
+                        w-full bg-white border-2 border-indigo-100 hover:bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl text-lg transition-colors
+                        ${learnedWords.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
                     `}
-                 >
-                    복습하기
-                 </button>
+                  >
+                    복습하기 (카드) 🔄
+                  </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-left">
+              <div className="mt-8 grid grid-cols-2 gap-4 text-left">
                 <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
                     <div className="text-2xl font-bold text-indigo-600 mb-1">{learnedWords.length}</div>
                     <div className="text-sm text-slate-500">학습한 단어</div>
@@ -227,10 +250,11 @@ export default function App() {
           </div>
         )}
 
-        {mode === AppMode.LEARN && currentSessionWords.length > 0 && (
+        {/* Learning or Review Flashcard Mode */}
+        {(mode === AppMode.LEARN || mode === AppMode.REVIEW_FLASHCARD) && currentSessionWords.length > 0 && (
           <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-100">
              <div className="w-full max-w-md mb-4 flex justify-between text-sm font-medium text-slate-500">
-                <span>Session Progress</span>
+                <span>{mode === AppMode.LEARN ? 'Learning' : 'Review'} Session</span>
                 <span>{currentIndex + 1} / {currentSessionWords.length}</span>
              </div>
              {/* Progress Bar */}
@@ -244,14 +268,16 @@ export default function App() {
              <Flashcard 
                 word={currentSessionWords[currentIndex]}
                 onNext={() => setCurrentIndex(prev => prev + 1)}
+                onPrev={currentIndex > 0 ? () => setCurrentIndex(prev => prev - 1) : undefined}
                 isLast={currentIndex === currentSessionWords.length - 1}
+                isFirst={currentIndex === 0}
                 onFinishBatch={handleFinishBatch}
              />
           </div>
         )}
 
-        {mode === AppMode.REVIEW && (
-          <ReviewMode 
+        {mode === AppMode.QUIZ && (
+          <QuizMode 
             words={learnedWords}
             onExit={handleGoHome}
           />
