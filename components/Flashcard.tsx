@@ -62,7 +62,7 @@ export const Flashcard: React.FC<FlashcardProps> = ({ word, onNext, onPrev, isLa
   }
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto h-[550px] perspective-1000">
+    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto h-[600px] perspective-1000">
       <div 
         className={`relative w-full h-full transition-transform duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`}
         onClick={() => setIsFlipped(!isFlipped)}
@@ -85,8 +85,8 @@ export const Flashcard: React.FC<FlashcardProps> = ({ word, onNext, onPrev, isLa
 
         {/* BACK */}
         <div className="absolute w-full h-full bg-white border border-indigo-100 rounded-2xl shadow-xl flex flex-col backface-hidden rotate-y-180 overflow-hidden">
-          {/* Image Header */}
-          <div className="h-48 w-full relative bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+          {/* Image Header - Increased height to h-72 (approx 288px) for better visibility */}
+          <div className="h-72 w-full relative bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
             {word.imageUrl ? (
               <img src={word.imageUrl} alt={word.kanji} className="w-full h-full object-cover animate-fade-in" />
             ) : (

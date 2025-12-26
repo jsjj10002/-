@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Word, AppMode } from './types';
 import { fetchNewWords, generateImageForWord } from './services/geminiService';
+import { getWordsFromCSV } from './services/vocabService';
 import { Flashcard } from './components/Flashcard';
 import { QuizMode } from './components/QuizMode';
 import { WordList } from './components/WordList';
@@ -60,7 +61,7 @@ export default function App() {
 
   const startLearning = async () => {
     setLoading(true);
-    setLoadingMessage("AI가 단어 리스트를 생성하고 있습니다...");
+    setLoadingMessage("단어 목록을 불러오는 중입니다...");
     sessionActiveRef.current = true;
 
     // Get list of existing kanji for this level
@@ -69,23 +70,62 @@ export default function App() {
       .map(w => w.kanji);
 
     try {
-        const newWords = await fetchNewWords(level, existingKanji);
+        // 1. Try to fetch raw words from CSV
+        const candidateWords = await getWordsFromCSV(level, existingKanji, 15);
+        
+        if (candidateWords.length === 0) {
+             setLoadingMessage("단어장이 비어있거나 불러올 수 없어 AI가 단어를 선정합니다...");
+        } else {
+             setLoadingMessage(`단어장(csv)에서 ${candidateWords.length}개의 단어를 선택했습니다. AI가 예문을 생성합니다...`);
+        }
+
+        // 2. Enrich with AI (Example sentences, meanings, image prompts)
+        const newWords = await fetchNewWords(level, existingKanji, candidateWords);
         const total = newWords.length;
         
-        for (let i = 0; i < total; i++) {
-            if (!sessionActiveRef.current) break; 
-            setLoadingMessage(`이미지 생성 중 (${i + 1}/${total})`);
-            
-            const word = newWords[i];
-            if (word.imagePrompt) {
-                 try {
-                     const url = await generateImageForWord(word.imagePrompt);
-                     if (url) word.imageUrl = url;
-                 } catch (e) {
-                     console.warn(`Failed to generate image`, e);
-                 }
+        // --- Parallel Agents Logic ---
+        setLoadingMessage(`이미지 생성 시작 (0/${total})`);
+        
+        let sharedIndex = 0;
+        let completedCount = 0;
+
+        // The worker function that each agent runs
+        const runAgent = async (agentId: number) => {
+            while (sharedIndex < total) {
+                if (!sessionActiveRef.current) break;
+                
+                // Atomically get the next task index
+                const myIndex = sharedIndex;
+                sharedIndex++;
+
+                if (myIndex >= total) break;
+
+                const word = newWords[myIndex];
+                if (word.imagePrompt) {
+                    try {
+                        const url = await generateImageForWord(word.imagePrompt);
+                        if (url) word.imageUrl = url;
+                    } catch (e) {
+                        console.warn(`Agent ${agentId} failed on word ${word.kanji}`, e);
+                    }
+                }
+                
+                completedCount++;
+                if (sessionActiveRef.current) {
+                    setLoadingMessage(`이미지 생성 중 (${completedCount}/${total})`);
+                }
             }
+        };
+
+        // Create 5 agents (15 words / 5 agents = 3 words per agent)
+        const AGENT_COUNT = 5;
+        const agents = [];
+        for (let i = 0; i < AGENT_COUNT; i++) {
+            agents.push(runAgent(i));
         }
+
+        // Wait for all agents to finish
+        await Promise.all(agents);
 
         if (sessionActiveRef.current) {
             setCurrentSessionWords(newWords);
@@ -164,7 +204,7 @@ export default function App() {
         {mode === AppMode.HOME && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in overflow-y-auto">
             <div className="max-w-md w-full py-8">
-              <h2 className="text-4xl font-bold text-indigo-900 mb-4">일본어 한자 마스터</h2>
+              <h2 className="text-4xl font-bold text-indigo-900 mb-4 tracking-tight">일본어 한자 마스터</h2>
               <p className="text-slate-500 mb-8 text-lg">AI와 함께 레벨별 한자를 학습하고 복습하세요.</p>
               
               {/* Learning Section */}
@@ -207,13 +247,13 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Review & Quiz Section */}
-              <div className="grid gap-4">
+              {/* Review & Quiz Section - Side by Side Layout */}
+              <div className="flex gap-4 w-full">
                   <button
                     onClick={() => { sessionActiveRef.current = false; setMode(AppMode.QUIZ); }}
                     disabled={learnedWords.length < 4}
                     className={`
-                        w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-lg shadow-md transition-all active:scale-95
+                        flex-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-3 rounded-xl text-lg shadow-sm transition-colors active:scale-95 border border-transparent
                         ${learnedWords.length < 4 ? 'opacity-50 cursor-not-allowed' : ''}
                     `}
                   >
@@ -224,7 +264,7 @@ export default function App() {
                     onClick={startReviewFlashcards}
                     disabled={learnedWords.length === 0}
                     className={`
-                        w-full bg-white border-2 border-indigo-100 hover:bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl text-lg transition-colors
+                        flex-1 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-600 font-bold py-3 rounded-xl text-lg shadow-sm transition-colors active:scale-95
                         ${learnedWords.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
                     `}
                   >
@@ -252,27 +292,29 @@ export default function App() {
 
         {/* Learning or Review Flashcard Mode */}
         {(mode === AppMode.LEARN || mode === AppMode.REVIEW_FLASHCARD) && currentSessionWords.length > 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-100">
-             <div className="w-full max-w-md mb-4 flex justify-between text-sm font-medium text-slate-500">
+          <div className="flex-1 flex flex-col items-center justify-start p-4 bg-slate-100 overflow-y-auto">
+             <div className="w-full max-w-md mb-4 flex justify-between text-sm font-medium text-slate-500 mt-4">
                 <span>{mode === AppMode.LEARN ? 'Learning' : 'Review'} Session</span>
                 <span>{currentIndex + 1} / {currentSessionWords.length}</span>
              </div>
              {/* Progress Bar */}
-             <div className="w-full max-w-md bg-slate-200 rounded-full h-2 mb-8">
+             <div className="w-full max-w-md bg-slate-200 rounded-full h-2 mb-8 shrink-0">
                 <div 
                     className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${((currentIndex + 1) / currentSessionWords.length) * 100}%` }}
                 ></div>
              </div>
 
-             <Flashcard 
-                word={currentSessionWords[currentIndex]}
-                onNext={() => setCurrentIndex(prev => prev + 1)}
-                onPrev={currentIndex > 0 ? () => setCurrentIndex(prev => prev - 1) : undefined}
-                isLast={currentIndex === currentSessionWords.length - 1}
-                isFirst={currentIndex === 0}
-                onFinishBatch={handleFinishBatch}
-             />
+             <div className="w-full pb-8">
+                <Flashcard 
+                    word={currentSessionWords[currentIndex]}
+                    onNext={() => setCurrentIndex(prev => prev + 1)}
+                    onPrev={currentIndex > 0 ? () => setCurrentIndex(prev => prev - 1) : undefined}
+                    isLast={currentIndex === currentSessionWords.length - 1}
+                    isFirst={currentIndex === 0}
+                    onFinishBatch={handleFinishBatch}
+                />
+             </div>
           </div>
         )}
 

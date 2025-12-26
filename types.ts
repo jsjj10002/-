@@ -13,6 +13,13 @@ export interface Word {
   learnedAt?: string; // ISO Date string
 }
 
+export interface RawWord {
+  original: string;
+  furigana: string;
+  english: string;
+  level: number;
+}
+
 export enum AppMode {
   HOME = 'HOME',
   LEARN = 'LEARN',
