@@ -80,7 +80,7 @@ export const fetchNewWords = async (level: number, existingKanji: string[], cand
         - meanings: Translate the English meaning to NATURAL KOREAN meanings (array of strings).
         - exampleSentence: A simple Japanese example sentence suitable for JLPT N${level}. CRITICAL: Put hiragana readings in brackets [] immediately after every Kanji word in the sentence. Example: "私[わたし]は学生[がくせい]です".
         - exampleMeaning: Korean translation of the sentence.
-        - imagePrompt: A detailed visual description to generate a Japanese anime style illustration representing this word.
+        - imagePrompt: A detailed visual description to generate a Japanese anime style illustration representing this word. Use keywords like "sentimental", "soft lighting", "beautiful scenery" to describe the scene.
       `;
   } else {
       // Fallback logic (Old method)
@@ -96,7 +96,7 @@ export const fetchNewWords = async (level: number, existingKanji: string[], cand
         - meanings: An array of Korean meanings (strings).
         - exampleSentence: A simple example sentence using the word. CRITICAL: Put hiragana readings in brackets [] immediately after every Kanji word in the sentence to support furigana display. Example: "私[わたし]は学生[がくせい]です".
         - exampleMeaning: Korean translation of the sentence.
-        - imagePrompt: A detailed visual description to generate a Japanese anime style illustration representing this word. (e.g. "anime style illustration of a cute cat sitting on a tatami mat", "anime style background of a japanese school").
+        - imagePrompt: A detailed visual description to generate a Japanese anime style illustration representing this word.
       `;
   }
 
@@ -162,12 +162,15 @@ export const generateImageForWord = async (prompt: string, retries = 5): Promise
     const ai = new GoogleGenAI({ apiKey });
     let currentTry = 0;
 
+    // Enhanced prompt for emotional/modern anime style
+    const styleSuffix = ", emotional japanese anime art style, beautiful soft lighting, sentimental atmosphere, makoto shinkai style, high quality digital art, detailed background, 4k";
+
     while (currentTry < retries) {
         try {
             // Using Imagen 4 Fast model for speed
             const response = await ai.models.generateImages({
                 model: 'imagen-4.0-fast-generate-001',
-                prompt: prompt + ", Japanese anime style, studio ghibli style, vibrant colors, simple, minimalist background",
+                prompt: prompt + styleSuffix,
                 config: {
                     numberOfImages: 1,
                     outputMimeType: 'image/jpeg',

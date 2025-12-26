@@ -71,8 +71,8 @@ export const Flashcard: React.FC<FlashcardProps> = ({ word, onNext, onPrev, isLa
         <div className="absolute w-full h-full bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col items-center justify-center backface-hidden p-8">
           <div className="text-sm text-slate-400 font-bold uppercase tracking-widest mb-4">Level {word.level}</div>
           
-          {/* Dynamic Kanji Size */}
-          <div className={`w-full text-center font-bold text-slate-800 mb-8 font-serif whitespace-nowrap ${getKanjiFontSize(word.kanji)}`}>
+          {/* Dynamic Kanji Size - Removed font-serif for consistency */}
+          <div className={`w-full text-center font-bold text-slate-800 mb-8 whitespace-nowrap ${getKanjiFontSize(word.kanji)}`}>
             {word.kanji}
           </div>
           

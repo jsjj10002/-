@@ -61,7 +61,7 @@ export default function App() {
 
   const startLearning = async () => {
     setLoading(true);
-    setLoadingMessage("단어 목록을 불러오는 중입니다...");
+    setLoadingMessage("학습 단어 구성중...");
     sessionActiveRef.current = true;
 
     // Get list of existing kanji for this level
@@ -73,13 +73,8 @@ export default function App() {
         // 1. Try to fetch raw words from CSV
         const candidateWords = await getWordsFromCSV(level, existingKanji, 15);
         
-        if (candidateWords.length === 0) {
-             setLoadingMessage("단어장이 비어있거나 불러올 수 없어 AI가 단어를 선정합니다...");
-        } else {
-             setLoadingMessage(`단어장(csv)에서 ${candidateWords.length}개의 단어를 선택했습니다. AI가 예문을 생성합니다...`);
-        }
-
         // 2. Enrich with AI (Example sentences, meanings, image prompts)
+        // Note: fetchNewWords already handles the prompt generation based on candidates
         const newWords = await fetchNewWords(level, existingKanji, candidateWords);
         const total = newWords.length;
         
@@ -180,8 +175,8 @@ export default function App() {
             className="flex items-center gap-2 cursor-pointer" 
             onClick={handleGoHome}
         >
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">漢</div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 hidden sm:block">Kanji Master AI</h1>
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">日</div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 hidden sm:block">일본어 단어장 AI</h1>
         </div>
         
         <div className="flex gap-2">
